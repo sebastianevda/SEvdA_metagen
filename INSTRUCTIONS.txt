@@ -1,0 +1,65 @@
+# for the below anything preceeded by a "#" is instructions. Everything else is commands for the command line in Linux. 
+# Make sure you specificy path to programs and files - these lines of code assume all programs and raw data are in the same directory - not recommended. 
+
+#Trimomatic command
+java -jar trimmomatic-0.32.jar PE -threads 10 150305_M01145_0180_000000000-ACUVD_1_IL-TP-019_1.sanfastq.gz 150305_M01145_0180_000000000-ACUVD_1_IL-TP-019_2.sanfastq.gz out_r1_pair.fq out_r1_unpair.fq out_r2_pair.fq out_r2_unpair.fq  LEADING:30 TRAILING:30 SLIDINGWINDOW:10:30 MINLEN:150
+
+#Assembled using PEAR:
+pear-0.9.6-bin-64/pear-0.9.6-bin-64 -f out_r1_pair.fq -r out_r2_pair.fq -o pear_default
+
+#Converted to phred 64:
+java -jar trimmomatic-0.32.jar SE -threads 5 pear_default.assembled.fastq pear_default.assembled64.fastq TOPHRED64:
+
+#Converted to fasta using fastxtoolkit:
+fastq_to_fasta -r -i pear_default.assembled64.fastq -o pear_default.assembled64.fasta
+
+#All with forward and reverse primer from correct orientation - replace primer sequences with those of interest
+grep "CTTGAAGACCTTCTGTAAAAATG" pear_default.assembled64.fasta > Forward.fa
+grep "CTCTTAAGACGGTAGCTCG" Forward.fa > Forward_and_rev_from_correct_orientation.fa
+
+#reverse complement assembly:
+fastx_reverse_complement -i pear_default.assembled64.fasta -o pear_default.assembled64_rev_comp.fasta
+
+All with forward and reverse primer from opposite orientation - replace primer sequences with those of interest
+grep "CTTGAAGACCTTCTGTAAAAATG" pear_default.assembled64_rev_comp.fasta > revComp_Forward.fa
+grep "CTCTTAAGACGGTAGCTCG" revComp_Forward.fa > Forward_and_rev_from_opposite_orientation.fa
+
+#concatenate all reads with forward and reverse barcode:
+cat Forward_and_rev_from_correct_orientation.fa  Forward_and_rev_from_opposite_orientation.fa > All_with_F_and_R.fa
+
+#Filter reads with two barcodes and trim 5' and 3' adenosines python script 1 with a min length of 265 for the amplicon not including primer site:
+python Script_1_split_barcodes_from_amplicon_tabular.py
+
+#surviving sequences in: All_with_F_and_R_and_2_barcodes_and_grthn265.fa
+
+#Count number of unique sequences per barcode pair - requires All_with_F_and_R_and_2_barcodes_and_grthn265.fa as input, run in a separate sub directory - will create a lot of files.
+./count_unique_seq_per_barcode_pair.sh
+
+#Identify those reads below noise threshold:
+python Script_2_identify_noise_sequences.py
+
+#remove noise sequences from All_with_F_and_R_and_2_barcodes_and_grthn265.fa:
+grep -Fxv -f noise_sequences.fa All_with_F_and_R_and_2_barcodes_and_grthn265.fa > All_with_F_and_R_and_2_barcodes_and_grthn265_minus_lsthn_5_pct_no_barcodes.fa
+
+#get all unique amplicons and count frequency:
+awk '{print $3}' All_with_F_and_R_and_2_barcodes_and_grthn265.fa | sort | uniq -c > unique_amplicons_with_counts.tab
+
+#The top X of these sequences can then be used to make a phylogeny however you choose. 
+
+#For each barcode pair, count the number of amplicons corresponding to each clade of the phylogeny - sequences in each clade are define in the .sh file:
+./grep_types.sh
+
+#will produce 4 files:
+#All_with_F_and_R_and_2_barcodes_and_grthn265_minus_lsthn_5_pct_type1_only.fa
+#All_with_F_and_R_and_2_barcodes_and_grthn265_minus_lsthn_5_pct_type2_only.fa
+#All_with_F_and_R_and_2_barcodes_and_grthn265_minus_lsthn_5_pct_type3_only.fa
+#All_with_F_and_R_and_2_barcodes_and_grthn265_minus_lsthn_5_pct_type4_only.fa
+
+#Then run:
+./grepping_for_barcodes1.sh > counts_per_barcode_type1.tab
+./grepping_for_barcodes2.sh > counts_per_barcode_type2.tab
+./grepping_for_barcodes3.sh > counts_per_barcode_type3.tab
+./grepping_for_barcodes4.sh > counts_per_barcode_type4.tab
+
+#These counts files can be loaded into excel for analysis - the order is the same as the input in grepping_for_barcodes1.sh
+
