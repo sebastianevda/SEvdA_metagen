@@ -3,6 +3,7 @@ import re
 #runs in python 2.6
 #requires assembled reads, all in same orientation, as input file
 #outputs the assembled reads trimmed of bases 5' or 3' to terminal barcodes, and prints tabular file as barcode1 barcode2 amplicon without primer sequences 
+#12/03/2020 - Thanks to Peter Cock ("Peter Cock" <Peter.Cock@hutton.ac.uk>) for finding an error.
 
 input_filename = "All_with_F_and_R.fa"
 output_filename = "All_with_F_and_R_and_2_barcodes_and_grthn265.fa"
@@ -71,15 +72,15 @@ for line in split:
             Rbar = after_rev_primer[:5-1]
             rbartest = rbartest +1
             countr5 = countr5 + 1
-        if len(before_forward_primer) is 4:
-            Rbar = before_forward_primer[:]
+        if len(after_rev_primer) is 4:
+            Rbar = after_rev_primer[:4]
             rbartest = rbartest +1
             countr4 = countr4 + 1
-        if len(before_forward_primer) is 3:
+        if len(after_rev_primer) is 3:
             countr3 = countr3 + 1
-        if len(before_forward_primer) is 2:
+        if len(after_rev_primer) is 2:
             countr2 = countr2 + 1
-        if len(before_forward_primer) is 1:
+        if len(after_rev_primer) is 1:
             countr1 = countr1 + 1
 
 
